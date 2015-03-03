@@ -23,7 +23,52 @@ describe("async-pool-cue", function() {
             assert.deepEqual(tasks, [1, 2, 3, 4]);
             s.assert.callOrder(s1, s2, s3, s4);
         });
-        it("should emit various events");
+        it("should call 'saturated' whenever full", function() {
+            var tasks = [];
+            var pending = [];
+            var q = poolCue.queue(function(task, next) {
+                tasks.push(task);
+                pending.push(next);
+            }, 3);
+            q.saturated = s.spy();
+            q.push(1);
+            q.push(2);
+            s.assert.notCalled(q.saturated);
+            q.push(3); // 3 running 0 queued
+            s.assert.calledOnce(q.saturated);
+            q.push(4); // 3 running 1 queued
+            s.assert.calledOnce(q.saturated);
+            pending[0](); // 3 running 0 queued
+            pending[1](); // 2 running 0 queued
+            s.assert.calledOnce(q.saturated);
+            q.push(5); // 3 running 0 queued
+            s.assert.calledTwice(q.saturated);
+        });
+        it("should call 'space' whenever a slot opens up", function() {
+            var tasks = [];
+            var pending = [];
+            var q = poolCue.queue(function(task, next) {
+                tasks.push(task);
+                pending.push(next);
+            }, 3);
+            q.space = s.spy();
+            q.push(1);
+            q.push(2);
+            q.push(3); // 3 running 0 queued
+            q.push(4); // 3 running 1 queued
+            s.assert.notCalled(q.space);
+            pending[0](); // 3 running 0 queued
+            s.assert.notCalled(q.space);
+            pending[1](); // 2 running 0 queued
+            s.assert.calledOnce(q.space);
+            pending[2](); // 1 running 0 queued
+            s.assert.calledOnce(q.space);
+            q.push(5); // 2 running 0 queued
+            q.push(6); // 3 running 0 queued
+            s.assert.calledOnce(q.space);
+            pending[3]();
+            s.assert.calledTwice(q.space);
+        });
 
         it("should pause and resume", function() {
             var tasks = [];
@@ -83,6 +128,52 @@ describe("async-pool-cue", function() {
             }
             assert.deepEqual(tasks, [1, 4, 2, 3]);
             s.assert.callOrder(s1, s4, s2, s3);
+        });
+        it("should call 'saturated' whenever full", function() {
+            var tasks = [];
+            var pending = [];
+            var q = poolCue.priorityQueue(function(task, next) {
+                tasks.push(task);
+                pending.push(next);
+            }, 3);
+            q.saturated = s.spy();
+            q.push(1, 0);
+            q.push(2, 0);
+            s.assert.notCalled(q.saturated);
+            q.push(3, 0); // 3 running 0 queued
+            s.assert.calledOnce(q.saturated);
+            q.push(4, 0); // 3 running 1 queued
+            s.assert.calledOnce(q.saturated);
+            pending[0](); // 3 running 0 queued
+            pending[1](); // 2 running 0 queued
+            s.assert.calledOnce(q.saturated);
+            q.push(5, 0); // 3 running 0 queued
+            s.assert.calledTwice(q.saturated);
+        });
+        it("should call 'space' whenever a slot opens up", function() {
+            var tasks = [];
+            var pending = [];
+            var q = poolCue.priorityQueue(function(task, next) {
+                tasks.push(task);
+                pending.push(next);
+            }, 3);
+            q.space = s.spy();
+            q.push(1, 0);
+            q.push(2, 0);
+            q.push(3, 0); // 3 running 0 queued
+            q.push(4, 0); // 3 running 1 queued
+            s.assert.notCalled(q.space);
+            pending[0](); // 3 running 0 queued
+            s.assert.notCalled(q.space);
+            pending[1](); // 2 running 0 queued
+            s.assert.calledOnce(q.space);
+            pending[2](); // 1 running 0 queued
+            s.assert.calledOnce(q.space);
+            q.push(5, 0); // 2 running 0 queued
+            q.push(6, 0); // 3 running 0 queued
+            s.assert.calledOnce(q.space);
+            pending[3]();
+            s.assert.calledTwice(q.space);
         });
     });
 });

@@ -28,7 +28,7 @@ function queue(worker, concurrency) {
 
         q.process();
 
-        if (q.saturated && q.running() === q.concurrency) {
+        if (q.saturated && q.running() === q.concurrency && q.length() == 0) {
             q.saturated();
         }
     }
@@ -38,7 +38,7 @@ function queue(worker, concurrency) {
         tasks: [],
         concurrency: concurrency,
         saturated: null,
-        empty: null,
+        space: null,
         drain: null,
         started: false,
         paused: false,
@@ -53,21 +53,23 @@ function queue(worker, concurrency) {
             if (q.paused) {
                 return;
             }
-            if (workers < q.concurrency && q.tasks.length) {
+            if (workers < concurrency && q.tasks.length) {
                 var task = q.tasks.shift();
-                if (q.empty && q.tasks.length === 0) {
-                    q.empty();
-                }
                 workers += 1;
                 var next = function () {
                     workers -= 1;
                     if (task.callback) {
                         task.callback.apply(task, arguments);
                     }
-                    if (q.drain && q.tasks.length + workers === 0) {
+                    var len = q.length();
+                    if (q.space && len === 0 && workers === (concurrency - 1)) {
+                        q.space();
+                    }
+                    if (q.drain && len + workers === 0) {
                         q.drain();
                     }
                     q.process();
+
                 };
                 worker(task.data, onlyOnce(next));
             }
@@ -131,7 +133,7 @@ function priorityQueue(worker, concurrency) {
         q.tasks.splice(binarySearch(q.tasks, item, compareTasks) + 1, 0, item);
 
         q.process();
-        if (q.saturated && q.running() === q.concurrency) {
+        if (q.saturated && q.running() === q.concurrency && q.length() == 0) {
             q.saturated();
         }
     }
