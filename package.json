@@ -1,6 +1,6 @@
 {
   "name": "async-pool-cue",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Limit concurrency of actions with a queue for Node.js",
   "main": "index.js",
   "scripts": {
